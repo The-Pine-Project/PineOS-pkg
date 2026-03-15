@@ -1,0 +1,19 @@
+pkgname=pkg-stable
+pkgver=1.0.1
+pkgrel=2
+pkgdesc="The latest stable build of pkg"
+arch=('x86_64')
+url="https://github.com/The-Pine-Project/PineOS-pkg"
+license=('GPL')
+depends=('pacman' 'bash' 'grep' 'sed')
+# Suggesting an AUR helper instead of requiring both
+optdepends=('paru: AUR support' 'yay: AUR support')
+
+source=('pkg.sh')
+sha256sums=('SKIP')
+
+package() {
+    install -dm755 "${pkgdir}/usr/bin"
+
+    install -m755 "${srcdir}/pkg.sh" "${pkgdir}/usr/bin/pkg"
+}
