@@ -1,0 +1,87 @@
+pkgname=pkg-edge
+pkgver=EDGE
+pkgrel=1
+pkgdesc="PineOS Package Manager — AUR/pacman wrapper with plugins, history, pinning, git/curl/wget"
+arch=('x86_64' 'aarch64' 'armv7h')
+url="https://github.com/The-Pine-Project/PineOS-pkg"
+license=('GPL3')
+depends=('pacman' 'bash' 'grep' 'sed' 'gawk' 'curl' 'git' 'coreutils')
+optdepends=(
+    'wget: wget download command support'
+    'paru: AUR support (preferred AUR helper)'
+    'yay: AUR support (fallback AUR helper)'
+    'vlock: terminal lock support (pkg lock)'
+    'makepkg: source build support (pkg build)'
+    'pacman-contrib: paccache for smarter cache cleanup'
+    'diffutils: show diff during self-update'
+)
+backup=("etc/pkg/pkg.conf")
+install=pkg.install
+
+source=('pkg.sh')
+sha256sums=('SKIP')
+
+package() {
+    # ── Binaries ──────────────────────────────────────────────────────────────
+    install -dm755 "${pkgdir}/usr/bin"
+    install -m755  "${srcdir}/pkg.sh" "${pkgdir}/usr/bin/pkg"
+
+    # ── Shared data ───────────────────────────────────────────────────────────
+    install -dm755 "${pkgdir}/usr/share/pkg"
+    install -dm755 "${pkgdir}/usr/share/pkg/plugins"
+
+    # Drop a copy of the PKGBUILD so update-self can version-bump it
+    install -m644 "${startdir}/PKGBUILD" "${pkgdir}/usr/share/pkg/PKGBUILD"
+
+    # ── Default system-wide config ────────────────────────────────────────────
+    install -dm755 "${pkgdir}/etc/pkg"
+    cat > "${pkgdir}/etc/pkg/pkg.conf" <<'EOF'
+# =============================================================================
+#  /etc/pkg/pkg.conf — system-wide defaults for PineOS Package Manager
+#  User config at: ~/.config/pkg/pkg.conf  (takes precedence)
+# =============================================================================
+
+[general]
+color=true
+confirm=true
+download_tool=auto
+max_history=1000
+aur_helper=auto
+
+[repos]
+stable=https://github.com/The-Pine-Project/pkg-stable-repo/raw/refs/heads/main
+self=https://github.com/The-Pine-Project/PineOS-pkg/raw/refs/heads/main
+pkgbuild_self=https://github.com/The-Pine-Project/PineOS-pkg/raw/refs/heads/main/pkg-stable/PKGBUILD
+
+[plugins]
+enabled=true
+EOF
+
+    # ── Man page stub ─────────────────────────────────────────────────────────
+    install -dm755 "${pkgdir}/usr/share/man/man1"
+    cat > "${pkgdir}/usr/share/man/man1/pkg.1" <<'MANEOF'
+.TH PKG 1 "2025" "PineOS" "PineOS Package Manager"
+.SH NAME
+pkg \- PineOS Package Manager
+.SH SYNOPSIS
+.B pkg
+[\fICOMMAND\fR] [\fIARGS\fR]
+.SH DESCRIPTION
+pkg is the PineOS package manager — a unified front-end for pacman, AUR helpers,
+source builds, GitHub clones, plugin extensions, package history, and more.
+.SH COMMANDS
+Run \fBpkg help\fR for the full command reference.
+.SH FILES
+.TP
+\fI~/.config/pkg/pkg.conf\fR
+User configuration file.
+.TP
+\fI~/.local/share/pkg/history.log\fR
+Operation history log.
+.TP
+\fI~/.config/pkg/plugins/\fR
+Directory for plugin files.
+.SH SEE ALSO
+pacman(8), makepkg(8), git(1), curl(1), wget(1)
+MANEOF
+}

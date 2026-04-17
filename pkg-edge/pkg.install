@@ -1,0 +1,18 @@
+post_install() {
+    echo " >> pkg vEDGE installed"
+    echo " >> Run 'pkg help' to get started"
+    echo " >> Config will be created at ~/.config/pkg/pkg.conf on first run"
+    echo " >> System-wide defaults: /etc/pkg/pkg.conf"
+}
+
+post_upgrade() {
+    echo " >> pkg upgraded to vEDGE"
+    echo " >> Your ~/.config/pkg/pkg.conf is preserved"
+    echo " >> Review changes: pkg config show"
+}
+
+post_remove() {
+    echo " >> pkg removed."
+    echo " >> Your personal config/history at ~/.config/pkg and ~/.local/share/pkg"
+    echo "    were NOT removed. Delete them manually if desired."
+}
