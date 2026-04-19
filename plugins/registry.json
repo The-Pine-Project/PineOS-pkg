@@ -1,0 +1,82 @@
+[
+  {
+    "id": "com.pineos.flatpak",
+    "name": "Flatpak",
+    "version": "1.0.0",
+    "author": "The Pine Project",
+    "desc": "Install, remove, update and search Flatpak apps from Flathub",
+    "requires": ["flatpak"],
+    "commands": ["flatpak-install", "flatpak-remove", "flatpak-update", "flatpak-list", "flatpak-search", "flatpak-info"],
+    "tags": ["flatpak", "flathub", "sandboxed"]
+  },
+  {
+    "id": "com.pineos.pip",
+    "name": "pip",
+    "version": "1.0.0",
+    "author": "The Pine Project",
+    "desc": "Python pip — manage global and user Python packages via pkg",
+    "requires": ["python", "pip3"],
+    "commands": ["pip-install", "pip-remove", "pip-update", "pip-list", "pip-search"],
+    "tags": ["python", "pip", "pypi"]
+  },
+  {
+    "id": "com.pineos.npm",
+    "name": "npm",
+    "version": "1.0.0",
+    "author": "The Pine Project",
+    "desc": "Node.js / npm — manage global npm packages and run scripts via pkg",
+    "requires": ["nodejs", "npm"],
+    "commands": ["npm-install", "npm-remove", "npm-update", "npm-list", "npm-run"],
+    "tags": ["node", "nodejs", "npm", "javascript"]
+  },
+  {
+    "id": "com.pineos.cargo",
+    "name": "cargo",
+    "version": "1.0.0",
+    "author": "The Pine Project",
+    "desc": "Rust / cargo — install, remove and update Rust binaries via cargo",
+    "requires": ["cargo"],
+    "commands": ["cargo-install", "cargo-remove", "cargo-update", "cargo-list"],
+    "tags": ["rust", "cargo", "crates"]
+  },
+  {
+    "id": "com.pineos.snap",
+    "name": "snap",
+    "version": "1.0.0",
+    "author": "The Pine Project",
+    "desc": "Snap package management — install, remove and update snaps via pkg",
+    "requires": ["snapd"],
+    "commands": ["snap-install", "snap-remove", "snap-update", "snap-list", "snap-search", "snap-info"],
+    "tags": ["snap", "snapcraft", "canonical"]
+  },
+  {
+    "id": "com.pineos.docker",
+    "name": "docker",
+    "version": "1.0.0",
+    "author": "The Pine Project",
+    "desc": "Docker shortcuts — pull images, run containers, manage compose stacks",
+    "requires": ["docker"],
+    "commands": ["docker-pull", "docker-run", "docker-stop", "docker-rm", "docker-ps", "docker-prune", "docker-compose-up", "docker-compose-down"],
+    "tags": ["docker", "containers", "compose", "devops"]
+  },
+  {
+    "id": "com.pineos.gem",
+    "name": "gem",
+    "version": "1.0.0",
+    "author": "The Pine Project",
+    "desc": "Ruby gems — install, remove and update Ruby gems globally via pkg",
+    "requires": ["ruby", "gem"],
+    "commands": ["gem-install", "gem-remove", "gem-update", "gem-list"],
+    "tags": ["ruby", "gem", "rubygems"]
+  },
+  {
+    "id": "com.pineos.systemd",
+    "name": "systemd",
+    "version": "1.0.0",
+    "author": "The Pine Project",
+    "desc": "systemd / systemctl helpers — start, stop, enable, status services via pkg",
+    "requires": ["systemctl"],
+    "commands": ["svc-start", "svc-stop", "svc-restart", "svc-enable", "svc-disable", "svc-status", "svc-log", "svc-list"],
+    "tags": ["systemd", "systemctl", "services", "daemons"]
+  }
+]
