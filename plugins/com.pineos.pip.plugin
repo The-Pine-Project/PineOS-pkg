@@ -1,0 +1,87 @@
+# =============================================================================
+#  Plugin: com.pineos.pip
+#  PineOS pkg plugin — Python pip integration
+#
+#  Install:   pkg plugin install com.pineos.pip
+#  Enable:    Add 'com.pineos.pip' under [plugins] in pkg.conf
+# =============================================================================
+
+PLUGIN_NAME="pip"
+PLUGIN_VERSION="1.0.0"
+PLUGIN_AUTHOR="The Pine Project"
+PLUGIN_DESC="Python pip integration — manage Python packages via pkg"
+
+PLUGIN_COMMANDS=(
+    "pip-install"
+    "pip-remove"
+    "pip-update"
+    "pip-list"
+    "pip-search"
+)
+
+plugin_help() {
+    printf "    ${GREEN}%-30s${NC} %s\n" "pip-install <pkg...>"   "Install Python package(s)"
+    printf "    ${GREEN}%-30s${NC} %s\n" "pip-remove  <pkg...>"   "Remove Python package(s)"
+    printf "    ${GREEN}%-30s${NC} %s\n" "pip-update  [pkg]"      "Upgrade one or all pip packages"
+    printf "    ${GREEN}%-30s${NC} %s\n" "pip-list"               "List installed Python packages"
+    printf "    ${GREEN}%-30s${NC} %s\n" "pip-search  <query>"    "Search PyPI (requires pip-search)"
+}
+
+_pip_cmd() {
+    if   command -v pip3  &>/dev/null; then echo "pip3"
+    elif command -v pip   &>/dev/null; then echo "pip"
+    else err "[pip] pip not found. Run: pkg install python-pip"; return 1; fi
+}
+
+plugin_cmd_pip-install() {
+    [[ -z "${1:-}" ]] && { err "[pip] Usage: pkg pip-install <package>"; return 1; }
+    local pip; pip=$(_pip_cmd) || return 1
+    msg "[pip] Installing: $*"
+    "$pip" install --user "$@" \
+        && msg "[pip] Installed: $*" \
+        || err "[pip] Install failed"
+}
+
+plugin_cmd_pip-remove() {
+    [[ -z "${1:-}" ]] && { err "[pip] Usage: pkg pip-remove <package>"; return 1; }
+    local pip; pip=$(_pip_cmd) || return 1
+    "$pip" uninstall -y "$@" \
+        && msg "[pip] Removed: $*" \
+        || err "[pip] Remove failed"
+}
+
+plugin_cmd_pip-update() {
+    local pip; pip=$(_pip_cmd) || return 1
+    if [[ -n "${1:-}" ]]; then
+        msg "[pip] Upgrading $1..."
+        "$pip" install --user --upgrade "$1"
+    else
+        msg "[pip] Upgrading all user-installed packages..."
+        "$pip" list --user --outdated --format=freeze \
+            | grep -v '^\-e' | cut -d= -f1 \
+            | xargs -r "$pip" install --user --upgrade
+        msg "[pip] All pip packages up to date"
+    fi
+}
+
+plugin_cmd_pip-list() {
+    local pip; pip=$(_pip_cmd) || return 1
+    info "[pip] Installed Python packages (user):"
+    "$pip" list --user
+}
+
+plugin_cmd_pip-search() {
+    [[ -z "${1:-}" ]] && { err "[pip] Usage: pkg pip-search <query>"; return 1; }
+    local pip; pip=$(_pip_cmd) || return 1
+    # pip search was removed; use PyPI JSON API via curl/wget
+    local query="$1"
+    info "[pip] Searching PyPI for: $query"
+    if command -v curl &>/dev/null; then
+        curl -s "https://pypi.org/pypi/$query/json" 2>/dev/null \
+            | grep -o '"summary":"[^"]*"' | head -1 | cut -d'"' -f4 \
+            && echo "(exact match)" \
+            || echo "No exact match. Visit: https://pypi.org/search/?q=$query"
+    else
+        echo "Visit: https://pypi.org/search/?q=$query"
+    fi
+}

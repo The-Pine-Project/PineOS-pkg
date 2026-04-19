@@ -1,0 +1,192 @@
+# =============================================================================
+#  Plugin: com.pineos.docker
+#  PineOS pkg plugin — Docker & Docker Compose integration
+#
+#  Requires: docker  (install via: pkg install docker)
+#  After install: sudo systemctl enable --now docker
+#                 sudo usermod -aG docker $USER  (then log out/in)
+#
+#  Install:  pkg plugin install com.pineos.docker
+#  Enable:   Add 'com.pineos.docker' under [plugins] in pkg.conf
+# =============================================================================
+
+PLUGIN_NAME="docker"
+PLUGIN_VERSION="1.0.0"
+PLUGIN_AUTHOR="The Pine Project"
+PLUGIN_DESC="Docker shortcuts — pull images, run containers, manage compose stacks"
+
+PLUGIN_COMMANDS=(
+    "docker-pull"
+    "docker-run"
+    "docker-stop"
+    "docker-rm"
+    "docker-ps"
+    "docker-images"
+    "docker-prune"
+    "docker-log"
+    "docker-exec"
+    "docker-compose-up"
+    "docker-compose-down"
+    "docker-compose-restart"
+    "docker-compose-log"
+)
+
+plugin_help() {
+    printf "    ${GREEN}%-35s${NC} %s\n" "docker-pull   <image[:tag]>"     "Pull an image from a registry"
+    printf "    ${GREEN}%-35s${NC} %s\n" "docker-run    <image> [args]"     "Run a container (interactive tty)"
+    printf "    ${GREEN}%-35s${NC} %s\n" "docker-stop   <name|id>"          "Stop a running container"
+    printf "    ${GREEN}%-35s${NC} %s\n" "docker-rm     <name|id>"          "Remove a stopped container"
+    printf "    ${GREEN}%-35s${NC} %s\n" "docker-ps     [--all]"            "List running containers (--all for stopped)"
+    printf "    ${GREEN}%-35s${NC} %s\n" "docker-images"                     "List downloaded images"
+    printf "    ${GREEN}%-35s${NC} %s\n" "docker-prune  [--all]"            "Remove dangling resources (--all to wipe)"
+    printf "    ${GREEN}%-35s${NC} %s\n" "docker-log    <name|id>"          "Tail container logs"
+    printf "    ${GREEN}%-35s${NC} %s\n" "docker-exec   <name> <cmd...>"    "Run a command inside a container"
+    printf "    ${GREEN}%-35s${NC} %s\n" "docker-compose-up   [dir] [-d]"   "Start a Compose stack (default: detached)"
+    printf "    ${GREEN}%-35s${NC} %s\n" "docker-compose-down [dir]"        "Stop and remove a Compose stack"
+    printf "    ${GREEN}%-35s${NC} %s\n" "docker-compose-restart [dir]"     "Restart a Compose stack"
+    printf "    ${GREEN}%-35s${NC} %s\n" "docker-compose-log  [dir]"        "Tail Compose stack logs"
+}
+
+_docker_require() {
+    command -v docker &>/dev/null && return 0
+    err "[docker] docker not found."
+    err "[docker] Install: pkg install docker"
+    err "[docker] Enable : sudo systemctl enable --now docker"
+    err "[docker] Add user: sudo usermod -aG docker \$USER  (then re-login)"
+    return 1
+}
+
+_compose_cd() {
+    # If a directory is given and contains a compose file, cd into it.
+    # Returns 0 and echos the effective dir.
+    local dir="${1:-.}"
+    local effective="$dir"
+    if [[ ! -f "$dir/docker-compose.yml" ]] && [[ ! -f "$dir/compose.yml" ]]; then
+        err "[docker] No docker-compose.yml / compose.yml found in: $dir"
+        return 1
+    fi
+    echo "$effective"
+}
+
+plugin_cmd_docker-pull() {
+    [[ -z "${1:-}" ]] && { err "[docker] Usage: pkg docker-pull <image[:tag]>"; return 1; }
+    _docker_require || return 1
+    msg "[docker] Pulling $1..."
+    docker pull "$1" && ok "[docker] Pulled: $1" || err "[docker] Pull failed: $1"
+}
+
+plugin_cmd_docker-run() {
+    [[ -z "${1:-}" ]] && { err "[docker] Usage: pkg docker-run <image> [extra docker args]"; return 1; }
+    _docker_require || return 1
+    local image="$1"; shift
+    msg "[docker] Running $image..."
+    docker run -it --rm "$image" "$@"
+}
+
+plugin_cmd_docker-stop() {
+    [[ -z "${1:-}" ]] && { err "[docker] Usage: pkg docker-stop <name|id>"; return 1; }
+    _docker_require || return 1
+    docker stop "$@" && ok "[docker] Stopped: $*" || err "[docker] Stop failed"
+}
+
+plugin_cmd_docker-rm() {
+    [[ -z "${1:-}" ]] && { err "[docker] Usage: pkg docker-rm <name|id>"; return 1; }
+    _docker_require || return 1
+    docker rm "$@" && ok "[docker] Removed: $*" || err "[docker] Remove failed"
+}
+
+plugin_cmd_docker-ps() {
+    _docker_require || return 1
+    if [[ "${1:-}" == "--all" ]]; then
+        docker ps -a
+    else
+        docker ps
+    fi
+}
+
+plugin_cmd_docker-images() {
+    _docker_require || return 1
+    docker images
+}
+
+plugin_cmd_docker-prune() {
+    _docker_require || return 1
+    if [[ "${1:-}" == "--all" ]]; then
+        warn "[docker] This will remove ALL unused images, containers, networks and volumes!"
+        read -rp "$(echo -e "${YELLOW}[?]${NC} Continue? [y/N] ")" ans
+        [[ "$ans" =~ ^[Yy]$ ]] || return 0
+        docker system prune -a --volumes
+    else
+        docker system prune -f
+    fi
+    ok "[docker] Pruned"
+}
+
+plugin_cmd_docker-log() {
+    [[ -z "${1:-}" ]] && { err "[docker] Usage: pkg docker-log <name|id>"; return 1; }
+    _docker_require || return 1
+    docker logs -f "$1"
+}
+
+plugin_cmd_docker-exec() {
+    [[ -z "${1:-}" ]] && { err "[docker] Usage: pkg docker-exec <name|id> <command...>"; return 1; }
+    _docker_require || return 1
+    local container="$1"; shift
+    docker exec -it "$container" "${@:-bash}"
+}
+
+# ── Compose ───────────────────────────────────────────────────────────────────
+
+_compose_cmd() {
+    # Detect 'docker compose' (v2 plugin) vs 'docker-compose' (v1)
+    if docker compose version &>/dev/null 2>&1; then echo "docker compose"
+    elif command -v docker-compose &>/dev/null; then echo "docker-compose"
+    else
+        err "[docker] Neither 'docker compose' plugin nor 'docker-compose' found."
+        err "[docker] Install: pkg install docker-compose"
+        return 1
+    fi
+}
+
+plugin_cmd_docker-compose-up() {
+    _docker_require || return 1
+    local dir="${1:-.}"
+    local detach="-d"
+    [[ "${2:-}" == "--foreground" ]] && detach=""
+    local effective; effective=$(_compose_cd "$dir") || return 1
+    local cc; cc=$(_compose_cmd) || return 1
+    msg "[docker] Starting Compose stack in $effective..."
+    (cd "$effective" && $cc up $detach --build) \
+        && ok "[docker] Stack started" \
+        || err "[docker] Compose up failed"
+}
+
+plugin_cmd_docker-compose-down() {
+    _docker_require || return 1
+    local dir="${1:-.}"
+    local effective; effective=$(_compose_cd "$dir") || return 1
+    local cc; cc=$(_compose_cmd) || return 1
+    msg "[docker] Stopping Compose stack in $effective..."
+    (cd "$effective" && $cc down) \
+        && ok "[docker] Stack stopped" \
+        || err "[docker] Compose down failed"
+}
+
+plugin_cmd_docker-compose-restart() {
+    _docker_require || return 1
+    local dir="${1:-.}"
+    local effective; effective=$(_compose_cd "$dir") || return 1
+    local cc; cc=$(_compose_cmd) || return 1
+    msg "[docker] Restarting Compose stack in $effective..."
+    (cd "$effective" && $cc restart) \
+        && ok "[docker] Stack restarted" \
+        || err "[docker] Compose restart failed"
+}
+
+plugin_cmd_docker-compose-log() {
+    _docker_require || return 1
+    local dir="${1:-.}"
+    local effective; effective=$(_compose_cd "$dir") || return 1
+    local cc; cc=$(_compose_cmd) || return 1
+    (cd "$effective" && $cc logs -f)
+}

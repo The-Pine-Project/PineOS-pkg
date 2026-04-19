@@ -1,0 +1,106 @@
+# =============================================================================
+#  Plugin: com.pineos.gem
+#  PineOS pkg plugin — Ruby Gems integration
+#
+#  Requires: ruby, gem  (install via: pkg install ruby)
+#
+#  Install:  pkg plugin install com.pineos.gem
+#  Enable:   Add 'com.pineos.gem' under [plugins] in pkg.conf
+# =============================================================================
+
+PLUGIN_NAME="gem"
+PLUGIN_VERSION="1.0.0"
+PLUGIN_AUTHOR="The Pine Project"
+PLUGIN_DESC="Ruby gems — install, remove and update Ruby gems globally via pkg"
+
+PLUGIN_COMMANDS=(
+    "gem-install"
+    "gem-remove"
+    "gem-update"
+    "gem-list"
+    "gem-search"
+    "gem-info"
+    "gem-cleanup"
+)
+
+plugin_help() {
+    printf "    ${GREEN}%-30s${NC} %s\n" "gem-install <g> [-v ver]" "Install a Ruby gem (optionally pinned version)"
+    printf "    ${GREEN}%-30s${NC} %s\n" "gem-remove  <g>"           "Uninstall a gem"
+    printf "    ${GREEN}%-30s${NC} %s\n" "gem-update  [gem]"         "Update one or all gems"
+    printf "    ${GREEN}%-30s${NC} %s\n" "gem-list    [query]"       "List installed gems"
+    printf "    ${GREEN}%-30s${NC} %s\n" "gem-search  <query>"       "Search RubyGems.org"
+    printf "    ${GREEN}%-30s${NC} %s\n" "gem-info    <g>"           "Show gem details"
+    printf "    ${GREEN}%-30s${NC} %s\n" "gem-cleanup"               "Remove old gem versions"
+}
+
+_gem_require() {
+    command -v gem &>/dev/null && return 0
+    err "[gem] gem not found."
+    err "[gem] Install Ruby: pkg install ruby"
+    return 1
+}
+
+plugin_cmd_gem-install() {
+    [[ -z "${1:-}" ]] && { err "[gem] Usage: pkg gem-install <gem> [-v version]"; return 1; }
+    _gem_require || return 1
+    msg "[gem] Installing $1..."
+    # Try user install first, fall back to sudo
+    gem install --user-install "$@" 2>/dev/null \
+        || sudo gem install "$@" \
+        && ok "[gem] Installed: $1" \
+        || err "[gem] Install failed: $1"
+}
+
+plugin_cmd_gem-remove() {
+    [[ -z "${1:-}" ]] && { err "[gem] Usage: pkg gem-remove <gem>"; return 1; }
+    _gem_require || return 1
+    gem uninstall "$@" 2>/dev/null \
+        || sudo gem uninstall "$@" \
+        && ok "[gem] Removed: $*" \
+        || err "[gem] Remove failed"
+}
+
+plugin_cmd_gem-update() {
+    _gem_require || return 1
+    if [[ -n "${1:-}" ]]; then
+        msg "[gem] Updating $1..."
+        gem update "$1" 2>/dev/null || sudo gem update "$1"
+        ok "[gem] Updated: $1"
+    else
+        msg "[gem] Updating all gems..."
+        gem update 2>/dev/null || sudo gem update
+        ok "[gem] All gems updated"
+    fi
+}
+
+plugin_cmd_gem-list() {
+    _gem_require || return 1
+    local filter="${1:-}"
+    info "[gem] Installed gems:"
+    if [[ -n "$filter" ]]; then
+        gem list | grep -i "$filter"
+    else
+        gem list
+    fi
+}
+
+plugin_cmd_gem-search() {
+    [[ -z "${1:-}" ]] && { err "[gem] Usage: pkg gem-search <query>"; return 1; }
+    _gem_require || return 1
+    info "[gem] Searching RubyGems.org for: $1"
+    gem search "$1" --remote
+}
+
+plugin_cmd_gem-info() {
+    [[ -z "${1:-}" ]] && { err "[gem] Usage: pkg gem-info <gem>"; return 1; }
+    _gem_require || return 1
+    gem info "$1" 2>/dev/null || gem specification "$1" 2>/dev/null \
+        || err "[gem] Gem not found: $1"
+}
+
+plugin_cmd_gem-cleanup() {
+    _gem_require || return 1
+    msg "[gem] Removing outdated gem versions..."
+    gem cleanup 2>/dev/null || sudo gem cleanup
+    ok "[gem] Cleanup complete"
+}

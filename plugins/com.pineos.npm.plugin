@@ -1,0 +1,75 @@
+# =============================================================================
+#  Plugin: com.pineos.npm
+#  PineOS pkg plugin — Node.js / npm integration
+#
+#  Install:   pkg plugin install com.pineos.npm
+#  Enable:    Add 'com.pineos.npm' under [plugins] in pkg.conf
+# =============================================================================
+
+PLUGIN_NAME="npm"
+PLUGIN_VERSION="1.0.0"
+PLUGIN_AUTHOR="The Pine Project"
+PLUGIN_DESC="npm / Node.js global package management via pkg"
+
+PLUGIN_COMMANDS=(
+    "npm-install"
+    "npm-remove"
+    "npm-update"
+    "npm-list"
+    "npm-run"
+)
+
+plugin_help() {
+    printf "    ${GREEN}%-30s${NC} %s\n" "npm-install <pkg...>"   "Install global npm package(s)"
+    printf "    ${GREEN}%-30s${NC} %s\n" "npm-remove  <pkg...>"   "Remove global npm package(s)"
+    printf "    ${GREEN}%-30s${NC} %s\n" "npm-update  [pkg]"      "Update one or all global packages"
+    printf "    ${GREEN}%-30s${NC} %s\n" "npm-list"               "List installed global packages"
+    printf "    ${GREEN}%-30s${NC} %s\n" "npm-run     <script>"   "Run an npm script in current dir"
+}
+
+_npm_require() {
+    command -v npm &>/dev/null \
+        || { err "[npm] npm not found. Run: pkg install nodejs npm"; return 1; }
+}
+
+plugin_cmd_npm-install() {
+    [[ -z "${1:-}" ]] && { err "[npm] Usage: pkg npm-install <package>"; return 1; }
+    _npm_require || return 1
+    msg "[npm] Installing globally: $*"
+    sudo npm install -g "$@" \
+        && msg "[npm] Installed: $*" \
+        || err "[npm] Install failed"
+}
+
+plugin_cmd_npm-remove() {
+    [[ -z "${1:-}" ]] && { err "[npm] Usage: pkg npm-remove <package>"; return 1; }
+    _npm_require || return 1
+    sudo npm uninstall -g "$@" \
+        && msg "[npm] Removed: $*" \
+        || err "[npm] Remove failed"
+}
+
+plugin_cmd_npm-update() {
+    _npm_require || return 1
+    if [[ -n "${1:-}" ]]; then
+        msg "[npm] Updating $1..."
+        sudo npm update -g "$1"
+    else
+        msg "[npm] Updating all global packages..."
+        sudo npm update -g
+        msg "[npm] All global npm packages updated"
+    fi
+}
+
+plugin_cmd_npm-list() {
+    _npm_require || return 1
+    info "[npm] Globally installed packages:"
+    npm list -g --depth=0
+}
+
+plugin_cmd_npm-run() {
+    [[ -z "${1:-}" ]] && { err "[npm] Usage: pkg npm-run <script>"; return 1; }
+    _npm_require || return 1
+    [[ ! -f "package.json" ]] && { err "[npm] No package.json in current directory"; return 1; }
+    npm run "$@"
+}

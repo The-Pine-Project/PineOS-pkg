@@ -1,0 +1,84 @@
+# =============================================================================
+#  Plugin: com.pineos.flatpak
+#  PineOS pkg plugin — Flatpak / Flathub integration
+#
+#  Install:   pkg plugin install com.pineos.flatpak
+#  Enable:    Add 'com.pineos.flatpak' under [plugins] in pkg.conf
+# =============================================================================
+
+PLUGIN_NAME="flatpak"
+PLUGIN_VERSION="1.0.0"
+PLUGIN_AUTHOR="The Pine Project"
+PLUGIN_DESC="Flatpak / Flathub integration for pkg"
+
+PLUGIN_COMMANDS=(
+    "flatpak-install"
+    "flatpak-remove"
+    "flatpak-update"
+    "flatpak-list"
+    "flatpak-search"
+    "flatpak-info"
+)
+
+plugin_help() {
+    printf "    ${GREEN}%-30s${NC} %s\n" "flatpak-install <app.id>"  "Install a Flatpak from Flathub"
+    printf "    ${GREEN}%-30s${NC} %s\n" "flatpak-remove  <app.id>"  "Remove a Flatpak app"
+    printf "    ${GREEN}%-30s${NC} %s\n" "flatpak-update"            "Update all installed Flatpaks"
+    printf "    ${GREEN}%-30s${NC} %s\n" "flatpak-list"              "List installed Flatpak apps"
+    printf "    ${GREEN}%-30s${NC} %s\n" "flatpak-search  <query>"   "Search Flathub"
+    printf "    ${GREEN}%-30s${NC} %s\n" "flatpak-info    <app.id>"  "Show Flatpak app info"
+}
+
+_flatpak_require() {
+    command -v flatpak &>/dev/null \
+        || { err "[flatpak] flatpak not installed. Run: pkg install flatpak"; return 1; }
+    # Ensure Flathub is added
+    flatpak remote-list 2>/dev/null | grep -q flathub \
+        || flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+}
+
+plugin_cmd_flatpak-install() {
+    local app="${1:-}"
+    [[ -z "$app" ]] && { err "[flatpak] Usage: pkg flatpak-install <app.id>"; return 1; }
+    _flatpak_require || return 1
+    msg "[flatpak] Installing $app from Flathub..."
+    flatpak install --noninteractive flathub "$app" \
+        && msg "[flatpak] Installed: $app" \
+        || err "[flatpak] Install failed: $app"
+}
+
+plugin_cmd_flatpak-remove() {
+    local app="${1:-}"
+    [[ -z "$app" ]] && { err "[flatpak] Usage: pkg flatpak-remove <app.id>"; return 1; }
+    _flatpak_require || return 1
+    flatpak uninstall --noninteractive "$app" \
+        && msg "[flatpak] Removed: $app" \
+        || err "[flatpak] Remove failed: $app"
+}
+
+plugin_cmd_flatpak-update() {
+    _flatpak_require || return 1
+    msg "[flatpak] Updating all Flatpak apps..."
+    flatpak update --noninteractive
+    msg "[flatpak] All Flatpaks up to date"
+}
+
+plugin_cmd_flatpak-list() {
+    _flatpak_require || return 1
+    info "[flatpak] Installed apps:"
+    flatpak list --app --columns=application,name,version
+}
+
+plugin_cmd_flatpak-search() {
+    local query="${1:-}"
+    [[ -z "$query" ]] && { err "[flatpak] Usage: pkg flatpak-search <query>"; return 1; }
+    _flatpak_require || return 1
+    flatpak search "$query"
+}
+
+plugin_cmd_flatpak-info() {
+    local app="${1:-}"
+    [[ -z "$app" ]] && { err "[flatpak] Usage: pkg flatpak-info <app.id>"; return 1; }
+    _flatpak_require || return 1
+    flatpak info "$app"
+}

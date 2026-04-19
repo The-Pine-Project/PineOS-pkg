@@ -1,0 +1,96 @@
+# =============================================================================
+#  Plugin: com.pineos.snap
+#  PineOS pkg plugin — Snapd / Snap Store integration
+#
+#  Requires: snapd  (install via: pkg install snapd)
+#  After install, enable snapd: pkg svc-enable snapd  (if systemd plugin loaded)
+#                           or: sudo systemctl enable --now snapd
+#
+#  Install:  pkg plugin install com.pineos.snap
+#  Enable:   Add 'com.pineos.snap' under [plugins] in pkg.conf
+# =============================================================================
+
+PLUGIN_NAME="snap"
+PLUGIN_VERSION="1.0.0"
+PLUGIN_AUTHOR="The Pine Project"
+PLUGIN_DESC="Snap package management — install, remove and update snaps via pkg"
+
+PLUGIN_COMMANDS=(
+    "snap-install"
+    "snap-remove"
+    "snap-update"
+    "snap-list"
+    "snap-search"
+    "snap-info"
+    "snap-refresh"
+)
+
+plugin_help() {
+    printf "    ${GREEN}%-30s${NC} %s\n" "snap-install <name> [--classic]" "Install a snap (add --classic for classic confinement)"
+    printf "    ${GREEN}%-30s${NC} %s\n" "snap-remove  <name>"             "Remove a snap"
+    printf "    ${GREEN}%-30s${NC} %s\n" "snap-update  [name]"             "Refresh one or all snaps"
+    printf "    ${GREEN}%-30s${NC} %s\n" "snap-refresh"                    "Alias for snap-update (all)"
+    printf "    ${GREEN}%-30s${NC} %s\n" "snap-list"                       "List installed snaps"
+    printf "    ${GREEN}%-30s${NC} %s\n" "snap-search  <query>"            "Search the Snap Store"
+    printf "    ${GREEN}%-30s${NC} %s\n" "snap-info    <name>"             "Show snap details"
+}
+
+_snap_require() {
+    command -v snap &>/dev/null && return 0
+    err "[snap] snap not found."
+    err "[snap] Install snapd: pkg install snapd"
+    err "[snap] Then enable : sudo systemctl enable --now snapd"
+    return 1
+}
+
+plugin_cmd_snap-install() {
+    [[ -z "${1:-}" ]] && { err "[snap] Usage: pkg snap-install <name> [--classic|--edge|--beta]"; return 1; }
+    _snap_require || return 1
+    msg "[snap] Installing $1..."
+    sudo snap install "$@" \
+        && ok "[snap] Installed: $1" \
+        || err "[snap] Install failed: $1"
+}
+
+plugin_cmd_snap-remove() {
+    [[ -z "${1:-}" ]] && { err "[snap] Usage: pkg snap-remove <name>"; return 1; }
+    _snap_require || return 1
+    sudo snap remove "$@" \
+        && ok "[snap] Removed: $*" \
+        || err "[snap] Remove failed"
+}
+
+plugin_cmd_snap-update() {
+    _snap_require || return 1
+    if [[ -n "${1:-}" ]]; then
+        msg "[snap] Refreshing $1..."
+        sudo snap refresh "$1" \
+            && ok "[snap] Refreshed: $1" \
+            || err "[snap] Refresh failed: $1"
+    else
+        msg "[snap] Refreshing all installed snaps..."
+        sudo snap refresh \
+            && ok "[snap] All snaps refreshed" \
+            || err "[snap] Refresh failed"
+    fi
+}
+
+plugin_cmd_snap-refresh() { plugin_cmd_snap-update "$@"; }
+
+plugin_cmd_snap-list() {
+    _snap_require || return 1
+    info "[snap] Installed snaps:"
+    snap list
+}
+
+plugin_cmd_snap-search() {
+    [[ -z "${1:-}" ]] && { err "[snap] Usage: pkg snap-search <query>"; return 1; }
+    _snap_require || return 1
+    snap find "$@"
+}
+
+plugin_cmd_snap-info() {
+    [[ -z "${1:-}" ]] && { err "[snap] Usage: pkg snap-info <name>"; return 1; }
+    _snap_require || return 1
+    snap info "$1"
+}

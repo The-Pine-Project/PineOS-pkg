@@ -1,0 +1,134 @@
+# =============================================================================
+#  Plugin: com.pineos.go
+#  PineOS pkg plugin — Go toolchain integration
+#
+#  Requires: go  (install via: pkg install go)
+#
+#  Install:  pkg plugin install com.pineos.go
+#  Enable:   Add 'com.pineos.go' under [plugins] in pkg.conf
+#
+#  NOTE: Binaries installed by 'go install' land in $GOPATH/bin (default ~/go/bin).
+#        Add that to your PATH:  export PATH="$PATH:$HOME/go/bin"
+# =============================================================================
+
+PLUGIN_NAME="go"
+PLUGIN_VERSION="1.0.0"
+PLUGIN_AUTHOR="The Pine Project"
+PLUGIN_DESC="Go toolchain — install and manage Go binaries via pkg"
+
+PLUGIN_COMMANDS=(
+    "go-install"
+    "go-remove"
+    "go-update"
+    "go-list"
+    "go-env"
+    "go-version"
+    "go-run"
+    "go-build"
+)
+
+plugin_help() {
+    printf "    ${GREEN}%-35s${NC} %s\n" "go-install <pkg[@ver]>"         "Install a Go binary (go install)"
+    printf "    ${GREEN}%-35s${NC} %s\n" "go-remove  <binary-name>"       "Remove a Go-installed binary from GOPATH"
+    printf "    ${GREEN}%-35s${NC} %s\n" "go-update  <pkg[@latest]>"      "Re-install a binary at @latest"
+    printf "    ${GREEN}%-35s${NC} %s\n" "go-list"                         "List binaries in GOPATH/bin"
+    printf "    ${GREEN}%-35s${NC} %s\n" "go-env    [var]"                 "Show Go env (or one variable)"
+    printf "    ${GREEN}%-35s${NC} %s\n" "go-version"                      "Print installed Go version"
+    printf "    ${GREEN}%-35s${NC} %s\n" "go-run    <file.go> [args]"      "Run a Go source file directly"
+    printf "    ${GREEN}%-35s${NC} %s\n" "go-build  [dir] [-o outfile]"    "Build a Go project"
+}
+
+_go_require() {
+    command -v go &>/dev/null && return 0
+    err "[go] go not found."
+    err "[go] Install: pkg install go"
+    return 1
+}
+
+_gopath_bin() {
+    local gp
+    gp=$(go env GOPATH 2>/dev/null) || gp="$HOME/go"
+    echo "$gp/bin"
+}
+
+plugin_cmd_go-install() {
+    [[ -z "${1:-}" ]] && { err "[go] Usage: pkg go-install <module/path[@version]>"; return 1; }
+    _go_require || return 1
+    local target="$1"
+    # Append @latest if no version given and it's a full module path
+    [[ "$target" =~ @ ]] || target="${target}@latest"
+    msg "[go] Installing $target..."
+    go install "$target" \
+        && ok "[go] Installed: $target  (binary in $(_gopath_bin))" \
+        || err "[go] Install failed: $target"
+}
+
+plugin_cmd_go-remove() {
+    [[ -z "${1:-}" ]] && { err "[go] Usage: pkg go-remove <binary-name>"; return 1; }
+    _go_require || return 1
+    local gobin; gobin=$(_gopath_bin)
+    local bin="$gobin/$1"
+    if [[ ! -f "$bin" ]]; then
+        err "[go] Binary not found in GOPATH/bin: $bin"
+        return 1
+    fi
+    rm -f "$bin" \
+        && ok "[go] Removed: $bin" \
+        || err "[go] Failed to remove: $bin"
+}
+
+plugin_cmd_go-update() {
+    [[ -z "${1:-}" ]] && { err "[go] Usage: pkg go-update <module/path>"; return 1; }
+    _go_require || return 1
+    local target="$1"
+    [[ "$target" =~ @ ]] || target="${target}@latest"
+    msg "[go] Updating $target..."
+    go install "$target" \
+        && ok "[go] Updated: $target" \
+        || err "[go] Update failed: $target"
+}
+
+plugin_cmd_go-list() {
+    _go_require || return 1
+    local gobin; gobin=$(_gopath_bin)
+    info "[go] Binaries in $gobin:"
+    if [[ -d "$gobin" ]]; then
+        ls -1 "$gobin"
+    else
+        info "(none — GOPATH/bin does not exist yet)"
+    fi
+    info ""
+    info "Tip: make sure $gobin is in your PATH"
+}
+
+plugin_cmd_go-env() {
+    _go_require || return 1
+    if [[ -n "${1:-}" ]]; then
+        go env "$1"
+    else
+        go env
+    fi
+}
+
+plugin_cmd_go-version() {
+    _go_require || return 1
+    go version
+}
+
+plugin_cmd_go-run() {
+    [[ -z "${1:-}" ]] && { err "[go] Usage: pkg go-run <file.go> [args]"; return 1; }
+    _go_require || return 1
+    go run "$@"
+}
+
+plugin_cmd_go-build() {
+    _go_require || return 1
+    local dir="${1:-.}"
+    local out="${2:-}"
+    local build_args=("$dir")
+    [[ -n "$out" ]] && build_args=("-o" "$out" "$dir")
+    msg "[go] Building $dir..."
+    go build "${build_args[@]}" \
+        && ok "[go] Build successful" \
+        || err "[go] Build failed"
+}
